@@ -1,0 +1,8 @@
+/ref-repos/
+/research/
+/docs/research.md
+/build/
+/stage/
+/dist/
+/.cache/
+/*.log

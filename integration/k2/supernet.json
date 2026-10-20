@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "id": "supernet",
+  "kind": "remote-access",
+  "title": "Developer tools",
+  "description": "Manage SSH, ADB and debugging controls.",
+  "executable": "/usr/bin/supernet",
+  "platforms": [
+    "kindle",
+    "kobo"
+  ],
+  "popover": {
+    "icon": "terminal",
+    "order": 50
+  }
+}

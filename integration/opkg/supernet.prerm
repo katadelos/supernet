@@ -1,0 +1,13 @@
+#!/bin/sh
+set -eu
+[ -z "${IPKG_INSTROOT:-}" ] || exit 0
+case "${1:-}" in
+    remove | upgrade)
+        if [ -x /var/run/eink-sdk/usr/bin/supernet ]; then
+            /var/run/eink-sdk/usr/bin/supernet prepare-remove
+        else
+            echo 'Supernet is unavailable; cannot check its active SSH service before removal.' >&2
+            exit 1
+        fi
+        ;;
+esac
