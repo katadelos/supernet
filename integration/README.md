@@ -39,8 +39,8 @@ cleans up its resources and exits before the hook succeeds.
 
 - `usr/sbin/dropbear` must be a regular multicall executable supporting the
   server and `dropbearkey` applets, Ed25519 host keys, `-D` for the authorized-key
-  directory and `-l` for interface binding. The packaged build includes patches
-  for userstore key permissions and the root session environment. Standard
+  directory and `-l` for interface binding, plus the root session environment
+  patch. Standard
   Dropbear builds may lack these features.
 - File transfers need the appropriate SCP or SFTP programs. SFTP support is
   supplied by a separate server package.
@@ -54,7 +54,8 @@ cleans up its resources and exits before the hook succeeds.
   Elipsa 2E loads `usb_f_ecm` and its dependencies through `control/modprobe`.
 
 Supernet stages executables in private RAM storage at `/dev/supernet-sdk` and
-keeps keys on userstore. Starting access refreshes the private Dropbear copy.
+keeps keys on userstore. Starting access refreshes the private Dropbear copy and
+copies `authorized_keys` into the runtime directory with Unix permissions.
 ADB runs from `/dev/supernet-sdk/bin/adbd`, so replacing or removing the package
 does not hide the running process from cleanup. ADB receives SIGTERM if its
 parent controller dies.

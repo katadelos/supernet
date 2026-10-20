@@ -163,7 +163,7 @@ static int start_ssh(struct service *service, const struct config *cfg)
                       "-r",
                       SN_HOSTKEY,
                       "-D",
-                      SN_KEYS,
+                      SN_RUN,
                       "-P",
                       SN_RUN "/dropbear.pid",
                       "-K",

@@ -85,8 +85,9 @@ ADB and exits the controller. `supernet shutdown` stops both SSH and ADB.
 
 Keep `authorized_keys` and the generated `host_ed25519` in Supernet's key
 directory across upgrades. The latter is the server's host key: preserving it
-retains the reader's SSH identity. Changes to `authorized_keys` apply to
-subsequent logins without restarting Supernet.
+retains the reader's SSH identity. Restart SSH after editing `authorized_keys`;
+Supernet uses a private runtime copy for authentication because userstore does
+not provide Unix file permissions.
 
 ## Configuration
 

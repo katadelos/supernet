@@ -59,8 +59,7 @@ int sn_keys_prepare(void)
         sn_log(LOG_ERR, "Add SSH public keys to %s", SN_KEYS "/authorized_keys");
         return -1;
     }
-    /* FAT userstore does not provide Unix file permissions; use the keys in
-     * Supernet's own directory directly. */
+    /* Host keys persist on userstore; Dropbear reads their explicit path. */
     if (lstat(SN_HOSTKEY, &st)) {
         if (errno != ENOENT) {
             return -1;
@@ -74,7 +73,11 @@ int sn_keys_prepare(void)
         sn_log(LOG_ERR, "Invalid SSH host key: %s", SN_HOSTKEY);
         return -1;
     }
-    return 0;
+    /* Dropbear checks authorized_keys and its directory permissions. FAT
+     * cannot provide those permissions, so authenticate from a private copy.
+     * TODO: Patch Dropbear to accept Kindle userstore permissions; its FAT
+     * mode bits do not represent a security boundary in that environment. */
+    return sn_copy(SN_KEYS "/authorized_keys", SN_RUN "/authorized_keys", 0600);
 }
 
 bool sn_package_busy(void)
