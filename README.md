@@ -9,6 +9,9 @@ Supernet does not enable remote access; you choose when to start and stop it.
 Supernet can also manage an optional ADB daemon and keep the reader awake
 while you work.
 
+The optional [KPP Mods extension](integration/kppmods/README.md) adds an SSH
+button to Kindle Quick Settings and a Wi-Fi SSH switch to Wi-Fi settings.
+
 ## Supported architectures
 
 ARMv7 Linux (32-bit, hard-float), with `kindlehf` and `kobov4` build targets.

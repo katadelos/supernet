@@ -21,8 +21,8 @@ After a staged CMake install, add the configuration:
 install -D -m 0644 config/supernet.conf stage/etc/supernet/config
 ```
 
-See [graphical controls](../docs/k2.md) for the optional UI integration and its
-feature descriptor.
+See the [KPP Mods extension](kppmods/README.md) for Kindle Quick Settings and
+Wi-Fi controls, or the [k2 integration](../docs/k2.md) for its feature descriptor.
 
 SSH keys live in `/mnt/us/supernet` on Kindle and `/mnt/onboard/supernet` on
 Kobo. Users create the directory and add `authorized_keys`; Supernet generates

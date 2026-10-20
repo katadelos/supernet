@@ -1,0 +1,20 @@
+{
+  "schema_version": 2,
+  "id": "supernet",
+  "version": "0.1.0",
+  "title": "Supernet SSH",
+  "description": "Control SSH from Quick Settings and Wi-Fi settings. Requires Supernet.",
+  "needs": ["ui-host"],
+  "requiresExecutables": {
+    "/var/run/eink-sdk/usr/bin/supernet": "Install Supernet to enable SSH."
+  },
+  "ui": ["main.js"],
+  "settings": {
+    "allowWifi": false
+  },
+  "settingsSchema": {
+    "allowWifi": {
+      "type": "boolean"
+    }
+  }
+}
