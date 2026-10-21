@@ -79,7 +79,10 @@ static int signal_sessions(pid_t parent, int signal_number)
 
 static int stop_orphan_sessions(void)
 {
-    int rc = sn_processes_stop(SN_BIN "dropbearmulti", getpid());
+    /* Connection processes can be reparented to init when the listener exits.
+     * The private executable identifies our SSH processes on every supported
+     * kernel, including those without PR_SET_CHILD_SUBREAPER. */
+    int rc = sn_processes_stop(SN_BIN "dropbearmulti", 0);
     while (waitpid(-1, NULL, WNOHANG) > 0) {
     }
     return rc;
@@ -127,9 +130,6 @@ static int stop_ssh(struct service *service)
         }
     }
     int cleanup = stop_orphan_sessions();
-    if (sn_processes_stop(SN_BIN "dropbearmulti", 0)) {
-        cleanup = -1;
-    }
     sn_log_drain(service->ssh_log, "dropbear");
     if (service->ssh_log >= 0) {
         close(service->ssh_log);
@@ -416,13 +416,6 @@ int sn_serve(bool background)
     }
     if (background && daemon(0, 0)) {
         sn_log(LOG_ERR, "daemonize control service: %s", strerror(errno));
-        close(lock);
-        return 1;
-    }
-    /* Keep established SSH connection processes owned if the listener dies.
-     * Both initial hardware targets provide Linux's child subreaper API. */
-    if (prctl(PR_SET_CHILD_SUBREAPER, 1)) {
-        sn_log(LOG_ERR, "cannot own SSH child lifecycle: %s", strerror(errno));
         close(lock);
         return 1;
     }
