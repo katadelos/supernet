@@ -14,7 +14,17 @@ button to Kindle Quick Settings and a Wi-Fi SSH switch to Wi-Fi settings.
 
 ## Supported architectures
 
-ARMv7 Linux (32-bit, hard-float), with `kindlehf` and `kobov4` build targets.
+ARMv7 Linux (32-bit), using the target that matches the reader's userspace ABI:
+
+| Build target | ABI | SDK root |
+| --- | --- | --- |
+| `kindle5` | Soft-float, older Kindle libc | `/mnt/us/.eink-sdk` |
+| `kindlepw2` | Soft-float | `/mnt/us/.eink-sdk` |
+| `kindlehf` | Hard-float | `/mnt/us/.eink-sdk` |
+| `kobov4` | Hard-float | `/mnt/onboard/.eink-sdk` |
+
+These are SDK platform names, not Kindle model numbers. Select the toolchain
+for the installed firmware; a reader's ABI can change across firmware releases.
 
 ## Install and connect
 
@@ -163,11 +173,12 @@ Other controllers' ADB processes are left alone. Package operations block
 `adb-start`, but stopping ADB remains possible during an upgrade or removal.
 
 Manual keep-awake and active SSH sessions request an expiring wake lease on
-supported kernels. An idle SSH listener allows sleep. The manual request resets
+supported kernels. Kindle Touch 5.3.7.3, Paperwhite 2 5.12.2.2 and Kobo Forma
+4.38 do not expose the required wake controls; `keepAwakeAvailable` is false
+on those firmwares. An idle SSH listener allows sleep. The manual request resets
 when the controller exits or the reader reboots; an unexpected exit releases
-the lease within 45 seconds. Forma firmware 4.38 does not expose the required
-wake controls. Stock firmware can still turn Wi-Fi off when the foreground
-application exits.
+the lease within 45 seconds. Stock firmware can still turn Wi-Fi off when the
+foreground application exits.
 
 ## Troubleshooting
 
@@ -207,8 +218,10 @@ cmake --build build/kindlehf
 DESTDIR="$PWD/stage" cmake --install build/kindlehf
 ```
 
-This stages `stage/usr/bin/supernet`. For Kobo, use a separate build directory,
-a Kobo toolchain, `SUPERNET_PLATFORM=kobov4` and
+This stages `stage/usr/bin/supernet`. For `kindle5` or `kindlepw2`, use a
+separate build directory, the corresponding soft-float toolchain and
+`SUPERNET_PLATFORM`, with the same Kindle SDK root. For Kobo, use a separate
+build directory, a Kobo toolchain, `SUPERNET_PLATFORM=kobov4` and
 `SUPERNET_SDK_ROOT=/mnt/onboard/.eink-sdk`. `SUPERNET_SDK_ROOT` selects the
 installation path on the reader, not the host staging directory. These are
 the supported platform/path pairs. `CMAKE_INSTALL_BINDIR` controls where the
