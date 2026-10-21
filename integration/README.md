@@ -49,7 +49,9 @@ cleans up its resources and exits before the hook succeeds.
   enabling a TCP listener by default.
 - The environment supplies the runtime mount/link layout, including
   `/var/run/eink-sdk`, and uses `/tmp/eink-opkg.lock` for package operations.
-- Kindle uses the firmware's `/usr/lib/liblipc.so` and iptables. Kobo uses
+- Kindle uses the firmware's `/usr/lib/liblipc.so`, `/usr/sbin/iptables` and
+  `/usr/sbin/iptables-save`. Wi-Fi access uses a private firewall chain and
+  requires no iptables comment extension. Kobo uses
   configfs USB gadgets; `control/device` must contain `forma` or `elipsa2e`.
   Elipsa 2E loads `usb_f_ecm` and its dependencies through `control/modprobe`.
 

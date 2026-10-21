@@ -4,9 +4,95 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <sys/wait.h>
+#include <syslog.h>
 #include <unistd.h>
+
+#ifndef SN_KOBO
+enum firewall_state { CHAIN_PRESENT = 1, JUMP_PRESENT = 2 };
+
+/* Firmware iptables 1.3 has neither -C nor -S, and older Kindle kernels lack
+ * the comment match. A private chain identifies our rule without extensions.
+ * Read back partial changes as well as successful starts for cleanup. */
+static int firewall_state(const char *token)
+{
+    char path[] = SN_RUN "/firewall-check-XXXXXX";
+    int fd = mkstemp(path);
+    if (fd < 0) {
+        return -1;
+    }
+    if (unlink(path) || fcntl(fd, F_SETFD, FD_CLOEXEC)) {
+        close(fd);
+        return -1;
+    }
+    pid_t pid = fork();
+    if (pid < 0) {
+        close(fd);
+        return -1;
+    }
+    if (!pid) {
+        if (dup2(fd, STDOUT_FILENO) < 0) {
+            _exit(127);
+        }
+        close(fd);
+        execl("/usr/sbin/iptables-save", "iptables-save", "-t", "filter", (char *)NULL);
+        _exit(127);
+    }
+    int status = 0;
+    uint64_t end = sn_now() + 3000;
+    pid_t result;
+    do {
+        result = waitpid(pid, &status, WNOHANG);
+        if (result == pid || (result < 0 && errno != EINTR)) {
+            break;
+        }
+        sn_sleep(25);
+    } while (sn_now() < end);
+    if (result != pid) {
+        kill(pid, SIGKILL);
+        while (waitpid(pid, &status, 0) < 0 && errno == EINTR) {
+        }
+    }
+    if (result != pid || !WIFEXITED(status) || WEXITSTATUS(status) || lseek(fd, 0, SEEK_SET)) {
+        sn_log(LOG_ERR, "could not read the Kindle firewall rules");
+        close(fd);
+        return -1;
+    }
+    FILE *file = fdopen(fd, "r");
+    if (!file) {
+        close(fd);
+        return -1;
+    }
+    char line[4096];
+    int present = 0;
+    size_t length = strlen(token);
+    while (fgets(line, sizeof(line), file)) {
+        if (!strchr(line, '\n') && !feof(file)) {
+            present = -1;
+            break;
+        }
+        if (*line == ':' && !strncmp(line + 1, token, length) && line[length + 1] == ' ') {
+            present |= CHAIN_PRESENT;
+        }
+        char *jump = strstr(line, " -j ");
+        if (!strncmp(line, "-A INPUT ", 9) && jump) {
+            jump += strlen(" -j ");
+            if (!strncmp(jump, token, length) && strchr(" \n", jump[length])) {
+                present |= JUMP_PRESENT;
+            }
+        }
+    }
+    if (ferror(file)) {
+        present = -1;
+    }
+    fclose(file);
+    return present;
+}
+#endif
 
 bool sn_firewall_pending(void)
 {
@@ -27,6 +113,11 @@ int sn_firewall_set(const struct config *cfg, const char *interface, const char 
     if (add) {
         snprintf(port, sizeof(port), "%u", cfg->port);
         snprintf(token, sizeof(token), "supernet-sdk-%ld", (long)getpid());
+        /* Never reserve a chain that already belongs to another controller. */
+        if (firewall_state(token) != 0) {
+            sn_log(LOG_ERR, "Supernet firewall chain is unavailable");
+            return -1;
+        }
         int fd =
             open(SN_RUN "/firewall", O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
         if (fd < 0) {
@@ -52,6 +143,7 @@ int sn_firewall_set(const struct config *cfg, const char *interface, const char 
                    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-") !=
                 strlen(old_interface) ||
             inet_pton(AF_INET, old_address, &ip) != 1 || strncmp(token, "supernet-sdk-", 13) ||
+            !token[13] || strlen(token) > 28 ||
             strspn(token + 13, "0123456789") != strlen(token + 13)) {
             return -1;
         }
@@ -60,7 +152,7 @@ int sn_firewall_set(const struct config *cfg, const char *interface, const char 
         snprintf(port, sizeof(port), "%u", old_port);
     }
     char *args[] = {"/usr/sbin/iptables",
-                    add ? "-I" : "-C",
+                    add ? "-I" : "-D",
                     "INPUT",
                     "-i",
                     (char *)interface,
@@ -70,22 +162,26 @@ int sn_firewall_set(const struct config *cfg, const char *interface, const char 
                     "tcp",
                     "--dport",
                     port,
-                    "-m",
-                    "comment",
-                    "--comment",
-                    token,
                     "-j",
-                    "ACCEPT",
+                    token,
                     NULL};
-    int rc = sn_run(args, 3000);
     if (add) {
-        return rc;
+        char *create[] = {"/usr/sbin/iptables", "-N", token, NULL};
+        char *accept[] = {"/usr/sbin/iptables", "-A", token, "-j", "ACCEPT", NULL};
+        if (sn_run(create, 3000) || sn_run(accept, 3000)) {
+            return -1;
+        }
+        return sn_run(args, 3000);
     }
-    if (!rc) {
-        args[1] = "-D";
-        rc = sn_run(args, 3000);
-    } else if (rc == 1) {
-        rc = 0; /* Journaled intent never reached iptables. */
+    int present = firewall_state(token);
+    if (present < 0) {
+        return -1;
+    }
+    int rc = (present & JUMP_PRESENT) ? sn_run(args, 3000) : 0;
+    if (!rc && (present & CHAIN_PRESENT)) {
+        char *flush[] = {"/usr/sbin/iptables", "-F", token, NULL};
+        char *remove[] = {"/usr/sbin/iptables", "-X", token, NULL};
+        rc = sn_run(flush, 3000) || sn_run(remove, 3000);
     }
     if (!rc && unlink(SN_RUN "/firewall")) {
         rc = -1;
